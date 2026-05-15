@@ -1,0 +1,15 @@
+{
+  "name": "pixelhunter",
+  "version": "1.0.0",
+  "description": "A real-time collaborative pixel game",
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "jest": {
+    "transform": {},
+    "testEnvironment": "jsdom"
+  }
+}
