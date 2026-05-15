@@ -71,7 +71,7 @@ Sign up at [render.com](https://render.com).
 **2. Connect your GitHub Repository**
 - Go to the **Blueprints** section in your Render dashboard.
 - Connect your GitHub account and select this repository.
-- Render will automatically detect the `render.yaml` file and set up your service.
+- Set the `uvicorn app.main:app --host 0.0.0.0 --port $PORT` command in the build settings.
 
 **3. Deploy**
 - Render will automatically deploy your app every time you push to the `main` branch.
