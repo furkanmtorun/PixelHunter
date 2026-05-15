@@ -1,6 +1,13 @@
-# PixelHunter
+<div>
+  <img src="./pixelhunter.png"/>
+  <h1 align="center">🚦PixelHunter</h1>
+  <p align="center">
+   <strong>Neon and modern version of Battleship</strong>
+   <br>
+    A strategic, turn-based pixel guessing game inspired by Battleship.
+  </p>
+</div>
 
-> **A strategic, turn-based pixel guessing game inspired by Battleship.**
 
 ---
 
@@ -43,4 +50,4 @@ The game ends immediately when a player achieves either:
 
 ---
 
-**Good luck, and happy hunting!**
+**Good luck, and happy pixel hunting!**
