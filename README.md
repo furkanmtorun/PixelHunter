@@ -9,6 +9,9 @@
 </div>
 
 
+> [!NOTE]
+> **🚀 AI-Driven Development:** I orchestrated the end-to-end development of this project using **Gemini** and **Claude** via **VS Code** and **Antigravity** IDEs, acting as the core architect and technical director to oversee system design, code review, and integration.
+> 
 ---
 
 ## 🎮 How to Play
