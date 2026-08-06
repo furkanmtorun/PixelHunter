@@ -1,6 +1,8 @@
 <div>
   <img src="./pixelhunter.png"/>
-  <h1 align="center">🚦PixelHunter</h1>
+  <h1 align="center">🚦PixelHunter <br> 
+    <a align="center" href="https://pixelhunter-9vdx.onrender.com/" target="_blank">Play Now</a>
+  </h1>
   <p align="center">
    <strong>Neon and modern version of Battleship</strong>
    <br>
