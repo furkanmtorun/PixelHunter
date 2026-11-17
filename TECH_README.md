@@ -76,8 +76,9 @@ PixelHunter/
 ## Game Modes
 
 Modes live in `backend/app/config.py` as the `MODES` dict; the server is the
-single source of truth. A room's mode is chosen by its host, published in the
-lobby, and inherited by the joining player. `matrix` is `(columns, rows)`.
+single source of truth. The host picks a mode on the main screen before
+entering the lobby; the room advertises it and the joining player inherits it.
+`matrix` is `(columns, rows)`.
 
 | Mode | Matrix | Hidden pixels (`max_pixels`) | Hits to win | Score to win |
 |---|---|---|---|---|
@@ -139,24 +140,29 @@ SKIP_TESTS=1 ./run.sh    # skip the test pass
 ## Deployment — Render.com
 
 The repo includes a `render.yaml` Blueprint using Render's projects/environments
-format, configured for the **STAGING** environment:
+format with two isolated environments:
 
-| Setting | Value |
-|---|---|
-| Project / environment | `PixelHunter` / `STAGING` |
-| Root directory | repo root |
-| Build command | `pip install -r backend/requirements.txt` |
-| Start command | `uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT --ws websockets --proxy-headers` |
-| Health check path | `/healthz` |
-| Workers | **1** (required — state is in memory) |
+| Setting | PROD | STAGING |
+|---|---|---|
+| Environment | `PROD` | `STAGING` |
+| Service name | `PixelHunter` | `PixelHunter Staging` |
+| Branch | `main` | `staging` |
+| Build command | `pip install -r backend/requirements.txt` | same |
+| Start command | `uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT --ws websockets --proxy-headers` | same |
+| Health check path | `/healthz` | `/healthz` |
+| Workers | **1** (state is in memory) | **1** |
+
+`main` deploys production and `staging` deploys staging; both auto-deploy on
+commit. Root directory is the repo root for both services.
 
 ### One-time Setup
 
 1. Create a Render account at [render.com](https://render.com).
 2. Go to **Blueprints** and connect this GitHub repository, or import the
    exported `render.yaml` into the existing project.
-3. Deploy. Pushes to the connected branch redeploy automatically
-   (`autoDeployTrigger: commit`).
+3. Sync the Blueprint. It creates `PixelHunter Staging` in `STAGING` and keeps
+   the existing `PixelHunter` service in `PROD`.
+4. Push to `main` to deploy production and to `staging` to deploy staging.
 
 The footer version comes from `RENDER_GIT_COMMIT`, which Render sets for you.
 

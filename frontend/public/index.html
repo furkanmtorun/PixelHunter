@@ -38,9 +38,12 @@
     <!-- Left: Enter details -->
     <div class="split-left">
       <div class="login-header">
-        <div>
-          <h2>PixelHunter</h2>
-          <p style="color:var(--text-muted);">2-player pixel battle. Pick a name and color, then fight.</p>
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          <div>
+            <h2>PixelHunter</h2>
+            <p class="brand-tagline">Two players. One board. Clear it or outscore your rival.</p>
+          </div>
         </div>
         <div class="online-badge">
           <span class="online-dot"></span>
@@ -48,12 +51,19 @@
         </div>
       </div>
       <div class="form-group">
-        <label>Username</label>
+        <label for="username-input">Username</label>
         <input type="text" id="username-input" placeholder="e.g. Commander" autocomplete="off" maxlength="15" />
       </div>
       <div class="form-group">
         <label>Your Color</label>
         <div id="user-color-wrap" class="color-grid"></div>
+      </div>
+      <div class="form-group mode-group">
+        <div class="form-label-row">
+          <label>Game Mode</label>
+          <span class="form-hint">You set the rules when you host</span>
+        </div>
+        <div id="mode-picker" class="mode-picker" role="radiogroup" aria-label="Game mode"></div>
       </div>
       <button id="login-btn" class="btn" disabled>Enter Lobby →</button>
     </div>
@@ -106,13 +116,6 @@
           </div>
         </div>
         <div class="rule-item">
-          <span class="rule-icon">🎛️</span>
-          <div>
-            <strong>Game Modes</strong>
-            <span>The room host picks Easy, Medium or Hard when creating a room. Everyone who joins inherits that room's board and rules.</span>
-          </div>
-        </div>
-        <div class="rule-item">
           <span class="rule-icon">👁️</span>
           <div>
             <strong>Board Toggle</strong>
@@ -135,19 +138,17 @@
         <h2>Game Lobby</h2>
         <p style="color:var(--text-muted);">Join an open game or create a new one.</p>
       </div>
-      <div id="online-badge" class="online-badge">
-        <span class="online-dot"></span>
-        <span class="online-count">0</span> online
+      <div class="lobby-header-meta">
+        <span id="lobby-mode-badge" class="mode-badge"></span>
+        <div id="online-badge" class="online-badge">
+          <span class="online-dot"></span>
+          <span class="online-count">0</span> online
+        </div>
       </div>
     </div>
 
     <div id="room-list">
       <div class="room-empty">No open games right now.</div>
-    </div>
-
-    <div class="lobby-mode">
-      <div class="lobby-mode-label">Game Mode</div>
-      <div id="mode-picker" class="mode-picker"></div>
     </div>
 
     <button id="create-room-btn" class="btn">Create New Room</button>

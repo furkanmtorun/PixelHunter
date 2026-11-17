@@ -19,7 +19,8 @@ export const MODE_OPTIONS = Object.freeze([
     maxPixels: 4,
     nHitToWin: 4,
     scoresToWin: 600,
-    blurb: '3×3 board · hide 4 · 4 hits or 600 pts',
+    blurb: '3×3 board · hide 4',
+    goal: '4 hits · 600 pts',
   },
   {
     key: 'medium',
@@ -28,7 +29,8 @@ export const MODE_OPTIONS = Object.freeze([
     maxPixels: 12,
     nHitToWin: 12,
     scoresToWin: 1000,
-    blurb: '6×6 board · hide 12 · 12 hits or 1000 pts',
+    blurb: '6×6 board · hide 12',
+    goal: '12 hits · 1000 pts',
   },
   {
     key: 'hard',
@@ -37,7 +39,8 @@ export const MODE_OPTIONS = Object.freeze([
     maxPixels: 20,
     nHitToWin: 11,
     scoresToWin: 1000,
-    blurb: '10×10 board · hide 20 · 11 hits or 1000 pts',
+    blurb: '10×10 board · hide 20',
+    goal: '11 hits · 1000 pts',
   },
 ]);
 

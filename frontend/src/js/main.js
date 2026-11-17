@@ -1,4 +1,4 @@
-import { state, PALETTE, MODE_OPTIONS, PHASE } from './config.js';
+import { state, PALETTE, MODE_OPTIONS, getMode, PHASE } from './config.js';
 import { initCanvas, redrawBoard, getIndex, hoverAt, clearHover } from './canvas.js';
 import { connect, send, joinLobby } from './network.js';
 import { showToast, updateLockButton } from './ui.js';
@@ -8,10 +8,67 @@ function inGame() {
   return state.gameState !== PHASE.LOGIN && state.gameState !== PHASE.LOBBY;
 }
 
+function refreshModeUI() {
+  const mode = getMode(state.selectedMode);
+  byId('lobby-mode-badge').textContent = `${mode.name} · ${mode.matrix.join('×')}`;
+  byId('create-room-btn').textContent = `Create ${mode.name} Room`;
+}
+
+function setupModePicker() {
+  const picker = byId('mode-picker');
+
+  for (const mode of MODE_OPTIONS) {
+    const option = document.createElement('button');
+    option.type = 'button';
+    option.className = 'mode-option';
+    option.dataset.mode = mode.key;
+    option.setAttribute('role', 'radio');
+    option.setAttribute('aria-checked', String(mode.key === state.selectedMode));
+    if (mode.key === state.selectedMode) option.classList.add('active');
+
+    const dot = document.createElement('span');
+    dot.className = 'mode-dot';
+    dot.setAttribute('aria-hidden', 'true');
+
+    const text = document.createElement('span');
+    text.className = 'mode-text';
+
+    const name = document.createElement('span');
+    name.className = 'mode-name';
+    name.textContent = mode.name;
+
+    const blurb = document.createElement('span');
+    blurb.className = 'mode-blurb';
+    blurb.textContent = mode.blurb;
+
+    text.append(name, blurb);
+
+    const goal = document.createElement('span');
+    goal.className = 'mode-goal';
+    goal.textContent = mode.goal;
+
+    option.append(dot, text, goal);
+    option.addEventListener('click', () => {
+      state.selectedMode = mode.key;
+      for (const el of picker.querySelectorAll('.mode-option')) {
+        const active = el === option;
+        el.classList.toggle('active', active);
+        el.setAttribute('aria-checked', String(active));
+      }
+      refreshModeUI();
+    });
+    picker.append(option);
+  }
+
+  refreshModeUI();
+}
+
 function setupLogin() {
   const colorWrap = byId('user-color-wrap');
   const loginBtn = byId('login-btn');
   const usernameInput = byId('username-input');
+
+  setupModePicker();
 
   PALETTE.forEach((color, index) => {
     const option = document.createElement('div');
@@ -53,33 +110,6 @@ function setupLogin() {
 }
 
 function setupLobby() {
-  const picker = byId('mode-picker');
-
-  for (const mode of MODE_OPTIONS) {
-    const option = document.createElement('button');
-    option.type = 'button';
-    option.className = 'mode-option';
-    option.dataset.mode = mode.key;
-    if (mode.key === state.selectedMode) option.classList.add('active');
-
-    const name = document.createElement('span');
-    name.className = 'mode-name';
-    name.textContent = mode.name;
-
-    const blurb = document.createElement('span');
-    blurb.className = 'mode-blurb';
-    blurb.textContent = mode.blurb;
-
-    option.append(name, blurb);
-    option.addEventListener('click', () => {
-      state.selectedMode = mode.key;
-      for (const el of picker.querySelectorAll('.mode-option')) {
-        el.classList.toggle('active', el === option);
-      }
-    });
-    picker.append(option);
-  }
-
   byId('create-room-btn').addEventListener('click', () => {
     send({
       type: 'create_room',

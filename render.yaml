@@ -1,17 +1,20 @@
-# Exported from Render on 2026-11-16T07:24:22Z, adapted for the
-# staging environment and the backend/ + frontend/ repository layout.
+# Render project with two isolated environments.
+#   PROD    -> deploys the `main` branch
+#   STAGING -> deploys the `staging` branch
 #
-# Keep a single uvicorn worker: lobby and match state live in process memory.
+# Keep a single uvicorn worker in both: lobby and match state live in process
+# memory, so players in the same room must land on the same process.
 version: "1"
 projects:
   - name: PixelHunter
     environments:
-      - name: STAGING
+      - name: PROD
         services:
           - type: web
             name: PixelHunter
             runtime: python
             repo: https://github.com/furkanmtorun/PixelHunter
+            branch: main
             plan: free
             region: frankfurt
             # Dependencies and the app both resolve from the repo root.
@@ -21,5 +24,23 @@ projects:
             autoDeployTrigger: commit
             envVars:
               # Render injects RENDER_GIT_COMMIT; the footer shows it automatically.
+              - key: PYTHONUNBUFFERED
+                value: "1"
+
+      - name: STAGING
+        services:
+          - type: web
+            name: PixelHunter Staging
+            runtime: python
+            repo: https://github.com/furkanmtorun/PixelHunter
+            branch: staging
+            plan: free
+            region: frankfurt
+            # Dependencies and the app both resolve from the repo root.
+            buildCommand: pip install -r backend/requirements.txt
+            startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT --ws websockets --proxy-headers
+            healthCheckPath: /healthz
+            autoDeployTrigger: commit
+            envVars:
               - key: PYTHONUNBUFFERED
                 value: "1"
