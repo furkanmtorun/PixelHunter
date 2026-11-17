@@ -1,4 +1,4 @@
-import { state, MAX_PIXELS, PHASE } from './config.js';
+import { state, PHASE } from './config.js';
 import { byId } from './dom.js';
 
 const onlineNodes = [];
@@ -42,8 +42,8 @@ export function setScores(p1Score, p2Score) {
 export function updateLockButton() {
   const lockBtn = byId('lock-btn');
   const count = state.myLockedPixels.size;
-  const ready = count === MAX_PIXELS;
-  lockBtn.textContent = `Lock In (${count}/${MAX_PIXELS})`;
+  const ready = count === state.maxPixels;
+  lockBtn.textContent = `Lock In (${count}/${state.maxPixels})`;
   lockBtn.classList.toggle('ready', ready);
   lockBtn.disabled = !ready;
 }
@@ -55,6 +55,14 @@ export function updateUI() {
   const p1Badge = byId('p1-badge');
   const p2Badge = byId('p2-badge');
   const container = byId('canvas-container');
+  const modeBadge = byId('mode-badge');
+
+  if (state.gameState !== PHASE.LOGIN && state.gameState !== PHASE.LOBBY) {
+    modeBadge.textContent = `${state.modeName} · ${state.GRID_W}×${state.GRID_H}`;
+    modeBadge.style.display = 'flex';
+  } else {
+    modeBadge.style.display = 'none';
+  }
 
   if (state.gameState === PHASE.WAITING) {
     stateText.textContent = 'Waiting for an opponent to join...';
@@ -64,7 +72,7 @@ export function updateUI() {
     toggleViewBtn.style.display = 'none';
     container.classList.remove('my-turn');
   } else if (state.gameState === PHASE.PLACEMENT) {
-    stateText.textContent = 'Place your 20 pixels!';
+    stateText.textContent = `Place your ${state.maxPixels} pixels!`;
     p1Badge.style.display = 'flex';
     p2Badge.style.display = 'flex';
     byId('p1-name').textContent = state.p1Name;
@@ -127,11 +135,22 @@ export function renderLobby(rooms) {
     name.className = 'room-name';
     name.textContent = room.name;
 
+    const title = document.createElement('div');
+    title.className = 'room-title';
+
+    const modeTag = document.createElement('span');
+    modeTag.className = 'room-mode';
+    const modeName = room.mode_name || 'Hard';
+    const matrix = Array.isArray(room.matrix) ? room.matrix.join('×') : '10×10';
+    modeTag.textContent = `${modeName} · ${matrix}`;
+
+    title.append(name, modeTag);
+
     const host = document.createElement('div');
     host.className = 'room-host';
     host.textContent = `Host: ${room.host}`;
 
-    info.append(name, host);
+    info.append(title, host);
 
     const join = document.createElement('button');
     join.className = 'join-btn';

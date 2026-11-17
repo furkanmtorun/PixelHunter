@@ -1,14 +1,25 @@
-services:
-  - type: web
-    name: pixelhunter
-    runtime: python
-    plan: free
-    rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --ws websockets --proxy-headers
-    healthCheckPath: /healthz
-    autoDeploy: true
-    envVars:
-      # Render injects RENDER_GIT_COMMIT; the footer shows it automatically.
-      - key: PYTHONUNBUFFERED
-        value: "1"
+# Exported from Render on 2026-11-16T07:24:22Z, adapted for the
+# staging environment and the backend/ + frontend/ repository layout.
+#
+# Keep a single uvicorn worker: lobby and match state live in process memory.
+version: "1"
+projects:
+  - name: PixelHunter
+    environments:
+      - name: STAGING
+        services:
+          - type: web
+            name: PixelHunter
+            runtime: python
+            repo: https://github.com/furkanmtorun/PixelHunter
+            plan: free
+            region: frankfurt
+            # Dependencies and the app both resolve from the repo root.
+            buildCommand: pip install -r backend/requirements.txt
+            startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT --ws websockets --proxy-headers
+            healthCheckPath: /healthz
+            autoDeployTrigger: commit
+            envVars:
+              # Render injects RENDER_GIT_COMMIT; the footer shows it automatically.
+              - key: PYTHONUNBUFFERED
+                value: "1"

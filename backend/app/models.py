@@ -14,7 +14,7 @@ from typing import Iterable, Optional
 
 from fastapi import WebSocket
 
-from .config import GRID_HEIGHT, GRID_WIDTH, STATE_WAITING
+from .config import DEFAULT_MODE, MODES, STATE_WAITING
 
 
 async def send_json(ws: WebSocket, message: dict) -> bool:
@@ -57,11 +57,16 @@ class Player:
 @dataclass
 class GameSession:
     name: str
+    mode: str = DEFAULT_MODE
     id: str = field(default_factory=lambda: uuid.uuid4().hex)
     p1: Optional[Player] = None
     p2: Optional[Player] = None
     state: str = STATE_WAITING
     turn: int = 1
+
+    @property
+    def settings(self) -> dict:
+        return MODES.get(self.mode, MODES[DEFAULT_MODE])
 
     @property
     def players(self) -> list[Player]:
@@ -87,25 +92,39 @@ class GameSession:
 
     @property
     def room_info(self) -> dict:
+        settings = self.settings
         return {
             "id": self.id,
             "name": self.name,
             "host": self.p1.username if self.p1 else "",
+            "mode": self.mode,
+            "mode_name": settings["mode_name"],
+            "mode_difficulty": settings["mode_difficulty"],
+            "matrix": list(settings["matrix"]),
         }
 
     def state_message(self, player_num: int) -> dict:
         """Per-player snapshot: each client only learns its own seat."""
+        settings = self.settings
+        width, height = settings["matrix"]
         return {
             "type": "game_state",
             "state": self.state,
             "player_num": player_num,
+            "mode": self.mode,
+            "mode_name": settings["mode_name"],
+            "mode_difficulty": settings["mode_difficulty"],
+            "matrix": list(settings["matrix"]),
+            "max_pixels": settings["max_pixels"],
+            "n_hit_to_win": settings["n_hit_to_win"],
+            "scores_to_win": settings["scores_to_win"],
             "p1_name": self.p1.username if self.p1 else None,
             "p2_name": self.p2.username if self.p2 else None,
             "p1_score": self.p1.score if self.p1 else 0,
             "p2_score": self.p2.score if self.p2 else 0,
             "turn": self.turn,
-            "grid_w": GRID_WIDTH,
-            "grid_h": GRID_HEIGHT,
+            "grid_w": width,
+            "grid_h": height,
         }
 
     async def send_state(self) -> set[Player]:

@@ -72,7 +72,7 @@
           <span class="rule-icon">🗺️</span>
           <div>
             <strong>Placement Phase</strong>
-            <span>Select exactly 20 pixels on the 10×10 grid to hide your targets. Click "Lock In" when you're satisfied.</span>
+            <span>Each mode has its own board and hidden-pixel count: Easy hides <b>4</b> on a 3×3 board, Medium <b>12</b> on 6×6, Hard <b>20</b> on 10×10. Click "Lock In" when you're satisfied.</span>
           </div>
         </div>
         <div class="rule-item">
@@ -98,7 +98,18 @@
           <span class="rule-icon">🏆</span>
           <div>
             <strong>Win Conditions</strong>
-            <span>Be the first to hit <b>11 of your opponent's pixels</b>, or reach a score of <b>1000 points</b>.</span>
+            <span>Clear the board or outscore your rival:<br>
+              Easy: <b>4 hits</b> or <b>600 pts</b> &nbsp;·&nbsp;
+              Medium: <b>12 hits</b> or <b>1000 pts</b> &nbsp;·&nbsp;
+              Hard: <b>11 hits</b> or <b>1000 pts</b>
+            </span>
+          </div>
+        </div>
+        <div class="rule-item">
+          <span class="rule-icon">🎛️</span>
+          <div>
+            <strong>Game Modes</strong>
+            <span>The room host picks Easy, Medium or Hard when creating a room. Everyone who joins inherits that room's board and rules.</span>
           </div>
         </div>
         <div class="rule-item">
@@ -134,6 +145,11 @@
       <div class="room-empty">No open games right now.</div>
     </div>
 
+    <div class="lobby-mode">
+      <div class="lobby-mode-label">Game Mode</div>
+      <div id="mode-picker" class="mode-picker"></div>
+    </div>
+
     <button id="create-room-btn" class="btn">Create New Room</button>
   </div>
 </div>
@@ -156,6 +172,7 @@
   <header id="header">
     <div id="logo">PixelHunter</div>
     <div id="status-bar">
+      <span id="mode-badge" class="mode-badge" style="display:none;"></span>
       <div id="game-state-text">Waiting to connect...</div>
 
       <button id="lock-btn">Lock In (0/20)</button>

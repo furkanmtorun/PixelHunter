@@ -30,8 +30,22 @@ const handlers = {
     state.myPlayerNum = msg.player_num ?? 0;
     state.p1Name = msg.p1_name || 'Player 1';
     state.p2Name = msg.p2_name || 'Player 2';
-    if (msg.grid_w) state.GRID_W = msg.grid_w;
-    if (msg.grid_h) state.GRID_H = msg.grid_h;
+
+    if (msg.mode) {
+      state.mode = msg.mode;
+      state.selectedMode = msg.mode;
+      state.modeName = msg.mode_name || msg.mode;
+    }
+    if (Array.isArray(msg.matrix) && msg.matrix.length === 2) {
+      state.GRID_W = msg.matrix[0];
+      state.GRID_H = msg.matrix[1];
+    } else {
+      if (msg.grid_w) state.GRID_W = msg.grid_w;
+      if (msg.grid_h) state.GRID_H = msg.grid_h;
+    }
+    if (typeof msg.max_pixels === 'number') state.maxPixels = msg.max_pixels;
+    if (typeof msg.n_hit_to_win === 'number') state.nHitToWin = msg.n_hit_to_win;
+    if (typeof msg.scores_to_win === 'number') state.scoresToWin = msg.scores_to_win;
     if (typeof msg.turn === 'number') state.currentTurn = msg.turn;
 
     setScores(msg.p1_score, msg.p2_score);

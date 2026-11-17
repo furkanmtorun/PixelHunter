@@ -1,4 +1,4 @@
-import { state, PALETTE, MAX_PIXELS, PHASE } from './config.js';
+import { state, PALETTE, MODE_OPTIONS, PHASE } from './config.js';
 import { initCanvas, redrawBoard, getIndex, hoverAt, clearHover } from './canvas.js';
 import { connect, send, joinLobby } from './network.js';
 import { showToast, updateLockButton } from './ui.js';
@@ -53,8 +53,39 @@ function setupLogin() {
 }
 
 function setupLobby() {
+  const picker = byId('mode-picker');
+
+  for (const mode of MODE_OPTIONS) {
+    const option = document.createElement('button');
+    option.type = 'button';
+    option.className = 'mode-option';
+    option.dataset.mode = mode.key;
+    if (mode.key === state.selectedMode) option.classList.add('active');
+
+    const name = document.createElement('span');
+    name.className = 'mode-name';
+    name.textContent = mode.name;
+
+    const blurb = document.createElement('span');
+    blurb.className = 'mode-blurb';
+    blurb.textContent = mode.blurb;
+
+    option.append(name, blurb);
+    option.addEventListener('click', () => {
+      state.selectedMode = mode.key;
+      for (const el of picker.querySelectorAll('.mode-option')) {
+        el.classList.toggle('active', el === option);
+      }
+    });
+    picker.append(option);
+  }
+
   byId('create-room-btn').addEventListener('click', () => {
-    send({ type: 'create_room', room_name: `${state.username}'s Game` });
+    send({
+      type: 'create_room',
+      room_name: `${state.username}'s Game`,
+      mode: state.selectedMode,
+    });
   });
 
   // One delegated listener survives every lobby re-render.
@@ -69,7 +100,7 @@ function setupGameControls() {
   const lockBtn = byId('lock-btn');
 
   lockBtn.addEventListener('click', () => {
-    if (state.myLockedPixels.size !== MAX_PIXELS) return;
+    if (state.myLockedPixels.size !== state.maxPixels) return;
 
     send({ type: 'lock_pixels', pixels: [...state.myLockedPixels] });
     lockBtn.textContent = 'Waiting for opponent...';
@@ -119,10 +150,10 @@ function setupCanvasInput() {
     if (state.gameState === PHASE.PLACEMENT) {
       if (state.myLockedPixels.has(index)) {
         state.myLockedPixels.delete(index);
-      } else if (state.myLockedPixels.size < MAX_PIXELS) {
+      } else if (state.myLockedPixels.size < state.maxPixels) {
         state.myLockedPixels.add(index);
       } else {
-        showToast(`You can only select ${MAX_PIXELS} pixels.`);
+        showToast(`You can only select ${state.maxPixels} pixels.`);
         return;
       }
 

@@ -16,7 +16,7 @@ State is held in memory in a **single process**. Do not scale the service to mul
 PixelHunter/
 ├── backend/
 │   ├── app/
-│   │   ├── config.py          # Board, scoring and phase constants
+│   │   ├── config.py          # Mode presets, scoring and phase constants
 │   │   ├── rules.py           # Pure scoring / win-condition helpers
 │   │   ├── models.py          # Player, GameSession, JSON send helpers
 │   │   ├── manager.py         # Lobby, matchmaking, turn handling
@@ -59,17 +59,41 @@ PixelHunter/
 | Direction | Type | Purpose |
 |---|---|---|
 | C → S | `join_lobby` | Register username/color for matchmaking |
-| C → S | `create_room` | Create a waiting room (creator becomes player 1) |
-| C → S | `join_room` | Join a waiting room (becomes player 2) |
-| C → S | `lock_pixels` | Submit exactly 20 hidden pixels |
+| C → S | `create_room` | Create a waiting room (creator becomes player 1); optional `mode` (`easy`/`medium`/`hard`, default `hard`) |
+| C → S | `join_room` | Join a waiting room (becomes player 2 and inherits its mode) |
+| C → S | `lock_pixels` | Submit the mode's required number of hidden pixels |
 | C → S | `guess` | Attack a cell |
-| S → C | `lobby_update` | Room list, online count, version (lobby clients) |
+| S → C | `lobby_update` | Room list (with mode metadata), online count, version (lobby clients) |
 | S → C | `presence` | Online count only (in-game clients) |
-| S → C | `game_state` | Personalised phase/seat/score snapshot |
+| S → C | `game_state` | Personalised phase/seat/score snapshot plus mode, matrix, `max_pixels` and win targets |
 | S → C | `start_playing` | Both players locked in |
 | S → C | `guess_result` | Hit/miss, scores, turn, game-over info |
 | S → C | `opponent_disconnected` | Match abandoned |
 | S → C | `error` | Invalid or rejected action |
+
+---
+
+## Game Modes
+
+Modes live in `backend/app/config.py` as the `MODES` dict; the server is the
+single source of truth. A room's mode is chosen by its host, published in the
+lobby, and inherited by the joining player. `matrix` is `(columns, rows)`.
+
+| Mode | Matrix | Hidden pixels (`max_pixels`) | Hits to win | Score to win |
+|---|---|---|---|---|
+| Easy | 3×3 | 4 | 4 | 600 |
+| Medium | 6×6 | 12 | 12 | 1000 |
+| Hard (default) | 10×10 | 20 | 11 | 1000 |
+
+Scoring is shared by every mode: 1st consecutive hit `+1`, 2nd `+99`, 3rd and
+later `min(500, (combo - 1) × 100)`. A miss costs `-1`, resets the combo, and
+passes the turn. `rules.has_won()` compares the guesser's score and the
+target's hit count against the room's mode.
+
+The frontend mirrors the presets in `frontend/src/js/config.js`
+(`MODE_OPTIONS`), but always overwrites them from the authoritative
+`game_state` payload (`mode`, `mode_name`, `matrix`, `max_pixels`,
+`n_hit_to_win`, `scores_to_win`).
 
 ---
 
@@ -114,21 +138,25 @@ SKIP_TESTS=1 ./run.sh    # skip the test pass
 
 ## Deployment — Render.com
 
-The repo includes a `render.yaml` Blueprint that matches the recommended setup:
+The repo includes a `render.yaml` Blueprint using Render's projects/environments
+format, configured for the **STAGING** environment:
 
 | Setting | Value |
 |---|---|
-| Root directory | `backend` |
-| Build command | `pip install -r requirements.txt` |
-| Start command | `uvicorn app.main:app --host 0.0.0.0 --port $PORT --ws websockets --proxy-headers` |
+| Project / environment | `PixelHunter` / `STAGING` |
+| Root directory | repo root |
+| Build command | `pip install -r backend/requirements.txt` |
+| Start command | `uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT --ws websockets --proxy-headers` |
 | Health check path | `/healthz` |
 | Workers | **1** (required — state is in memory) |
 
 ### One-time Setup
 
 1. Create a Render account at [render.com](https://render.com).
-2. Go to **Blueprints** and connect this GitHub repository (or keep your existing Web Service and mirror the settings above).
-3. Deploy. Pushes to the connected branch redeploy automatically.
+2. Go to **Blueprints** and connect this GitHub repository, or import the
+   exported `render.yaml` into the existing project.
+3. Deploy. Pushes to the connected branch redeploy automatically
+   (`autoDeployTrigger: commit`).
 
 The footer version comes from `RENDER_GIT_COMMIT`, which Render sets for you.
 

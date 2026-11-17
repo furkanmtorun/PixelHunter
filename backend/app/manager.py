@@ -16,13 +16,13 @@ from fastapi import WebSocket
 
 from .config import (
     DEFAULT_COLOR,
-    MAX_PIXELS,
+    DEFAULT_MODE,
+    MODES,
     ROOM_NAME_MAX_LENGTH,
     STATE_GAME_OVER,
     STATE_PLACEMENT,
     STATE_PLAYING,
     STATE_WAITING,
-    TOTAL_PIXELS,
     USERNAME_MAX_LENGTH,
 )
 from .models import GameSession, Player, broadcast_sockets, send_json
@@ -54,6 +54,11 @@ def clean_color(raw: object) -> str:
 def clean_room_name(raw: object) -> str:
     name = str(raw or "").strip()[:ROOM_NAME_MAX_LENGTH]
     return name or "Battle Room"
+
+
+def clean_mode(raw: object) -> str:
+    mode = str(raw or "").strip().lower()
+    return mode if mode in MODES else DEFAULT_MODE
 
 
 class GameManager:
@@ -179,7 +184,7 @@ class GameManager:
             await send_json(ws, {"type": "error", "message": "Join the lobby first."})
             return
 
-        game = GameSession(clean_room_name(data.get("room_name")))
+        game = GameSession(clean_room_name(data.get("room_name")), clean_mode(data.get("mode")))
         game.p1 = Player(ws, profile.username, profile.color)
         self.games[game.id] = game
         self.ws_to_game[ws] = game
@@ -217,9 +222,14 @@ class GameManager:
         if game.state != STATE_PLACEMENT or player.locked_pixels:
             return
 
+        settings = game.settings
+        max_pixels = settings["max_pixels"]
+        width, height = settings["matrix"]
+        total_pixels = width * height
+
         raw = data.get("pixels")
         if not isinstance(raw, list):
-            await send_json(ws, {"type": "error", "message": f"Select exactly {MAX_PIXELS} pixels."})
+            await send_json(ws, {"type": "error", "message": f"Select exactly {max_pixels} pixels."})
             return
         try:
             pixels = {int(value) for value in raw}
@@ -227,8 +237,8 @@ class GameManager:
             await send_json(ws, {"type": "error", "message": "Invalid pixel selection."})
             return
 
-        if len(pixels) != MAX_PIXELS or any(p < 0 or p >= TOTAL_PIXELS for p in pixels):
-            await send_json(ws, {"type": "error", "message": f"Select exactly {MAX_PIXELS} pixels."})
+        if len(pixels) != max_pixels or any(p < 0 or p >= total_pixels for p in pixels):
+            await send_json(ws, {"type": "error", "message": f"Select exactly {max_pixels} pixels."})
             return
 
         player.locked_pixels = pixels
@@ -255,7 +265,8 @@ class GameManager:
         opponent = game.opponent(ws)
         if opponent is None:
             return
-        if index < 0 or index >= TOTAL_PIXELS:
+        width, height = game.settings["matrix"]
+        if index < 0 or index >= width * height:
             return
         if index in opponent.hits_on_me or index in opponent.misses_on_me:
             return
@@ -267,7 +278,7 @@ class GameManager:
             register_miss(player, opponent, index)
             game.turn = 2 if game.turn == 1 else 1
 
-        game_over = has_won(player, opponent)
+        game_over = has_won(player, opponent, game.settings)
         winner = 0
         if game_over:
             game.state = STATE_GAME_OVER

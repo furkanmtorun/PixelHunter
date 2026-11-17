@@ -8,10 +8,8 @@ from __future__ import annotations
 from .config import (
     COMBO_STEP_POINTS,
     FIRST_HIT_POINTS,
-    HITS_TO_WIN,
     MAX_COMBO_POINTS,
     MISS_POINTS,
-    SCORE_TO_WIN,
     SECOND_HIT_POINTS,
 )
 from .models import Player
@@ -42,6 +40,9 @@ def register_miss(guesser: Player, target: Player, index: int) -> None:
     guesser.score += MISS_POINTS
 
 
-def has_won(guesser: Player, target: Player) -> bool:
-    """True when the guesser has reached either win condition."""
-    return len(target.hits_on_me) >= HITS_TO_WIN or guesser.score >= SCORE_TO_WIN
+def has_won(guesser: Player, target: Player, mode: dict) -> bool:
+    """True when the guesser reached either target for the given mode."""
+    return (
+        len(target.hits_on_me) >= mode["n_hit_to_win"]
+        or guesser.score >= mode["scores_to_win"]
+    )

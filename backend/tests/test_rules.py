@@ -1,6 +1,6 @@
 """Unit tests for the pure scoring rules."""
 
-from app.config import HITS_TO_WIN, MAX_COMBO_POINTS, SCORE_TO_WIN
+from app.config import MAX_COMBO_POINTS, MODES
 from app.rules import has_won, points_for_combo, register_hit, register_miss
 
 
@@ -35,19 +35,34 @@ def test_hit_and_miss_bookkeeping() -> None:
     assert target.misses_on_me == {5}
 
 
-def test_win_conditions() -> None:
+def test_win_conditions_per_mode() -> None:
     class FakePlayer:
         def __init__(self) -> None:
             self.score = 0
             self.hits_on_me: set[int] = set()
 
-    guesser = FakePlayer()
-    target = FakePlayer()
-    assert has_won(guesser, target) is False
+    for mode in MODES.values():
+        guesser = FakePlayer()
+        target = FakePlayer()
+        assert has_won(guesser, target, mode) is False
 
-    target.hits_on_me = set(range(HITS_TO_WIN))
-    assert has_won(guesser, target) is True
+        target.hits_on_me = set(range(mode["n_hit_to_win"] - 1))
+        assert has_won(guesser, target, mode) is False
 
-    target.hits_on_me = set()
-    guesser.score = SCORE_TO_WIN
-    assert has_won(guesser, target) is True
+        target.hits_on_me.add(mode["n_hit_to_win"] - 1)
+        assert has_won(guesser, target, mode) is True
+
+        target.hits_on_me = set()
+        guesser.score = mode["scores_to_win"] - 1
+        assert has_won(guesser, target, mode) is False
+
+        guesser.score = mode["scores_to_win"]
+        assert has_won(guesser, target, mode) is True
+
+
+def test_mode_targets_are_reachable() -> None:
+    for mode in MODES.values():
+        columns, rows = mode["matrix"]
+        hidden = mode["max_pixels"]
+        assert hidden <= columns * rows
+        assert mode["n_hit_to_win"] <= hidden

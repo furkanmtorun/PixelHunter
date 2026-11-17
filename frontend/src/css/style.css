@@ -86,6 +86,19 @@ html, body {
   box-shadow: 0 0 10px rgba(124,106,247,0.4);
 }
 
+.mode-badge {
+  display: flex;
+  align-items: center;
+  background: rgba(124,106,247,0.15);
+  border: 1px solid rgba(124,106,247,0.5);
+  color: var(--accent);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 #game-state-text {
   font-weight: 600;
   color: var(--accent2);
@@ -360,6 +373,67 @@ input[type="text"]:focus {
   box-shadow: none;
 }
 
+/* Mode picker */
+.lobby-mode {
+  margin: 18px 0 4px;
+}
+
+.lobby-mode-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.mode-picker {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.mode-option {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mode-option:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.mode-option.active {
+  border-color: var(--accent);
+  background: rgba(124,106,247,0.18);
+  box-shadow: 0 0 0 1px var(--accent), var(--glow);
+}
+
+.mode-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.mode-blurb {
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+
+@media (max-width: 640px) {
+  .mode-picker { grid-template-columns: 1fr; }
+}
+
 /* Lobby List */
 #room-list {
   display: flex;
@@ -390,6 +464,24 @@ input[type="text"]:focus {
 }
 .room-item .room-name { font-weight: 600; color: var(--text); }
 .room-item .room-host { font-size: 0.85rem; color: var(--text-muted); }
+
+.room-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.room-mode {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--accent2);
+  background: rgba(247,106,170,0.12);
+  border: 1px solid rgba(247,106,170,0.4);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
 
 .room-empty {
   text-align: center;
