@@ -391,6 +391,12 @@ input[type="text"]:focus {
 .room-item .room-name { font-weight: 600; color: var(--text); }
 .room-item .room-host { font-size: 0.85rem; color: var(--text-muted); }
 
+.room-empty {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-muted);
+}
+
 .join-btn {
   background: rgba(124,106,247,0.15);
   color: var(--accent);

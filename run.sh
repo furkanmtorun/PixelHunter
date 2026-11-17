@@ -1,24 +1,28 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT"
+
+PYTHON="${PYTHON:-python3}"
+PORT="${PORT:-8000}"
 
 echo "📦 Installing backend dependencies..."
-pip install -r backend/requirements.txt
+"$PYTHON" -m pip install -r backend/requirements-dev.txt
 
-# echo "🧪 Running backend tests..."
-# PYTHONPATH=$PWD/backend pytest backend/tests/
-
-# echo "📦 Installing frontend dependencies..."
-# cd frontend
-# npm install
-# echo "🧪 Running frontend tests..."
-# npm test
-# cd ..
+if [[ "${SKIP_TESTS:-0}" != "1" ]]; then
+  echo "🧪 Running tests..."
+  (cd backend && "$PYTHON" -m pytest -q)
+fi
 
 echo ""
-echo "🚀 Starting PixelHunter server..."
-echo "   Open http://localhost:8000 in your browser"
-echo "   Open multiple tabs to see real-time sync!"
+echo "🚀 Starting PixelHunter on http://localhost:${PORT}"
+echo "   Open two tabs to see real-time sync."
 echo ""
 
 cd backend
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+exec "$PYTHON" -m uvicorn app.main:app \
+  --host 0.0.0.0 \
+  --port "$PORT" \
+  --reload \
+  --reload-dir app

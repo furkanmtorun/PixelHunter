@@ -3,79 +3,133 @@
 This document describes the codebase architecture for the **PixelHunter** Battleship game.
 
 ## Overview
-PixelHunter uses a modular architecture with a **FastAPI/WebSocket backend** and a **Vanilla JS/HTML5 Canvas frontend**. The game runs completely over WebSockets using JSON message passing.
+
+PixelHunter uses a modular architecture with a **FastAPI/WebSocket backend** and a **Vanilla JS/HTML5 Canvas frontend**. The game runs entirely over WebSockets using JSON message passing.
+
+State is held in memory in a **single process**. Do not scale the service to multiple workers or instances: players in the same room must land on the same process.
 
 ---
 
 ## Directory Structure
 
 ```text
-RealTimeApp/
-├── backend/                  # Python backend application
+PixelHunter/
+├── backend/
 │   ├── app/
-│   │   ├── config.py         # Game constants (grid size, limits)
-│   │   ├── game.py           # Core game logic (Player, GameSession, GameManager)
-│   │   └── main.py           # FastAPI entry point, static serving, WebSocket routing
-│   ├── tests/                # Pytest suites
-│   └── requirements.txt      # Python dependencies
-├── frontend/                 # Static frontend application
-│   ├── public/
-│   │   └── index.html        # Main HTML skeleton and layout
+│   │   ├── config.py          # Board, scoring and phase constants
+│   │   ├── rules.py           # Pure scoring / win-condition helpers
+│   │   ├── models.py          # Player, GameSession, JSON send helpers
+│   │   ├── manager.py         # Lobby, matchmaking, turn handling
+│   │   ├── version.py         # Deployed revision (Render/git), cached
+│   │   └── main.py            # FastAPI app, static serving, /ws, /healthz
+│   ├── tests/                 # Pytest suites (protocol + rules)
+│   ├── pytest.ini
+│   ├── requirements.txt       # Runtime dependencies (used by Render)
+│   └── requirements-dev.txt   # Runtime + pytest/httpx
+├── frontend/
+│   ├── public/index.html      # Markup, module preloads, non-blocking font
 │   ├── src/
-│   │   ├── css/
-│   │   │   └── style.css     # UI styles and animations
-│   │   └── js/               # Modularized ES6 game logic
-│   │       ├── canvas.js     # Grid and pixel rendering
-│   │       ├── config.js     # Shared configuration and game state
-│   │       ├── main.js       # Bootstrapping and event listeners
-│   │       ├── network.js    # WebSocket handlers and parsers
-│   │       └── ui.js         # DOM manipulators and Toasts
-│   └── package.json          # Frontend dependencies (optional/testing)
-├── README.md                 # Game rules and instructions
-├── TECH_README.md            # Technical documentation
-└── run.sh                    # Setup and run script
+│   │   ├── css/style.css
+│   │   └── js/
+│   │       ├── config.js      # Palette, phases, shared state
+│   │       ├── dom.js         # Cached DOM lookups
+│   │       ├── canvas.js      # Rendering, hover layer, pointer mapping
+│   │       ├── network.js     # WebSocket, message dispatch, reconnect
+│   │       ├── ui.js          # DOM updates, lobby list, toasts
+│   │       └── main.js        # Bootstrapping and input handling
+│   ├── tests/                 # `node --test` suites
+│   └── package.json
+├── render.yaml                # Optional Render Blueprint
+├── run.sh                     # Local setup + tests + dev server
+└── TECH_README.md
 ```
 
 ---
 
 ## Data Flow
-1. **Client -> Server (WebSocket):** The user clicks the HTML canvas or interacts with a DOM element. The Javascript event listener (`frontend/src/js/main.js`) triggers `state.ws.send()` with a JSON payload (e.g., `{"type": "guess", "index": 45}`).
-2. **Server Handling:** `backend/app/main.py` receives the string, parses it into JSON, and hands it off to `GameManager.handle_message()` inside `backend/app/game.py`.
-3. **Game State Processing:** The `GameManager` checks the user's game session. It determines if it's the player's turn, validates the guess against the opponent's `locked_pixels` set, calculates score and combo, and modifies the `GameSession` state.
-4. **Server -> Client (WebSocket):** The `GameManager` broadcasts a `{"type": "guess_result", ...}` JSON message back to both connected clients via the `GameSession.broadcast()` function.
-5. **Client UI Update:** `frontend/src/js/network.js` parses the message. It updates the client's local `state` object, then triggers `redrawBoard()` and `updateUI()` to visually reflect the hits, misses, scores, and turn indicators.
 
-## Versioning
-The game version is dynamically retrieved from Git (Tag or Commit ID) and displayed in the global footer. This allows for clear tracking of deployments and updates.
+1. **Client → Server:** A canvas/DOM listener in `frontend/src/js/main.js` calls `send()` from `network.js`, which serialises a JSON payload (e.g. `{"type":"guess","index":45}`).
+2. **Server:** `backend/app/main.py` parses the frame and calls `GameManager.handle_message()` in `manager.py`.
+3. **Game state:** `GameManager` validates the action, updates the `GameSession`, and applies scoring through `rules.py`.
+4. **Server → Client:** Results are fanned out to both players concurrently via `GameSession.broadcast()`.
+5. **Client UI:** `network.js` dispatches to a handler map, updates local state, and schedules a single canvas repaint via `requestAnimationFrame`.
+
+### Message types
+
+| Direction | Type | Purpose |
+|---|---|---|
+| C → S | `join_lobby` | Register username/color for matchmaking |
+| C → S | `create_room` | Create a waiting room (creator becomes player 1) |
+| C → S | `join_room` | Join a waiting room (becomes player 2) |
+| C → S | `lock_pixels` | Submit exactly 20 hidden pixels |
+| C → S | `guess` | Attack a cell |
+| S → C | `lobby_update` | Room list, online count, version (lobby clients) |
+| S → C | `presence` | Online count only (in-game clients) |
+| S → C | `game_state` | Personalised phase/seat/score snapshot |
+| S → C | `start_playing` | Both players locked in |
+| S → C | `guess_result` | Hit/miss, scores, turn, game-over info |
+| S → C | `opponent_disconnected` | Match abandoned |
+| S → C | `error` | Invalid or rejected action |
+
+---
+
+## Performance Notes
+
+The refactor focuses on removing work from the hot paths:
+
+- **Concurrent fan-out.** Broadcasts await all socket writes with `asyncio.gather` instead of sending serially.
+- **Coalesced lobby updates.** A burst of connects produces one lobby snapshot, not one per connect, so cost stays O(n) instead of O(n²).
+- **Smaller audience.** In-game clients receive `presence` (just the online count) instead of the full room list; only lobby clients get `lobby_update`.
+- **One state message.** `game_state` is personalised per player, eliminating the extra `player_num` round-trip and duplicate canvas setup.
+- **Cached/compressed assets.** GZip middleware compresses CSS/JS/HTML, static files are served with ETag + `Cache-Control`, and `index.html` uses `FileResponse` (304s for free).
+- **Non-blocking font.** Google Fonts loads without blocking first paint; modules are `modulepreload`ed.
+- **Cheap rendering.** Board paints are coalesced per animation frame, the hover layer is separate, canvas rects are cached, and the board uses an opaque 2D context with DPR scaling.
+- **Robust versioning.** The footer revision prefers Render's `RENDER_GIT_COMMIT` and falls back to `git describe`, so boot does not depend on a git binary. Test-only dependencies are in `requirements-dev.txt`, keeping the Render install lean.
+- **Lean runtime deps.** `uvicorn[standard]` brings `uvloop`/`httptools` for faster HTTP and WebSocket handling.
+
+### Measured impact (local loopback)
+
+| Check | Before | After |
+|---|---|---|
+| `GET /` transfer | 7.8 KB | 2.4 KB (gzip) |
+| `GET /src/css/style.css` | 12.0 KB | 2.9 KB (gzip) |
+| `GET /src/js/main.js` | 6.6 KB | 1.7 KB (gzip) |
+| Lobby fan-out, 200 sockets @ 1 ms simulated send | 232 ms serial | 3.7 ms concurrent |
+
+Gzip trades a little CPU per response for 65–75% less transfer, which is the right trade over the network (the local times above are dominated by per-request overhead, so judge by bytes rather than loopback latency).
+
+---
 
 ## Running Locally
-Use the provided `run.sh` script to install dependencies, run tests, and boot the Uvicorn server automatically.
+
+```bash
+./run.sh                 # install deps, run tests, start on :8000
+SKIP_TESTS=1 ./run.sh    # skip the test pass
+```
+
+- Backend tests: `cd backend && pytest -q`
+- Frontend tests: `cd frontend && npm test` (Node's built-in runner, no dependencies)
 
 ---
 
 ## Deployment — Render.com
 
-The repo is pre-configured for deployment to [Render.com](https://render.com).
+The repo includes a `render.yaml` Blueprint that matches the recommended setup:
 
-### Files Added
-| File | Purpose |
+| Setting | Value |
 |---|---|
-| `requirements.txt` | Python dependencies (FastAPI, uvicorn, etc.) |
-| `render.yaml` | Render Blueprint: defines the web service, build, and start commands |
+| Root directory | `backend` |
+| Build command | `pip install -r requirements.txt` |
+| Start command | `uvicorn app.main:app --host 0.0.0.0 --port $PORT --ws websockets --proxy-headers` |
+| Health check path | `/healthz` |
+| Workers | **1** (required — state is in memory) |
 
-### One-time Setup (you must do this once)
+### One-time Setup
 
-**1. Create a Render Account**
-Sign up at [render.com](https://render.com).
+1. Create a Render account at [render.com](https://render.com).
+2. Go to **Blueprints** and connect this GitHub repository (or keep your existing Web Service and mirror the settings above).
+3. Deploy. Pushes to the connected branch redeploy automatically.
 
-**2. Connect your GitHub Repository**
-- Go to the **Blueprints** section in your Render dashboard.
-- Connect your GitHub account and select this repository.
-- Set the `uvicorn app.main:app --host 0.0.0.0 --port $PORT` command in the build settings.
+The footer version comes from `RENDER_GIT_COMMIT`, which Render sets for you.
 
-**3. Deploy**
-- Render will automatically deploy your app every time you push to the `main` branch.
-- Your app will be available at `https://pixelhunter.onrender.com` (or similar).
-
-> Note: On the free tier, Render "spins down" services after inactivity. The first request after a spin-down may take a few seconds to boot up.
-
+> **Free tier:** services spin down after inactivity, so the first request after a pause can take a few seconds. Keep the instance warm with a scheduled request to `/healthz` if that matters for your demo.

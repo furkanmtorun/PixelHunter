@@ -1,5 +1,29 @@
+"""Game rules and tuning constants shared by the whole backend."""
+
+# Board
 GRID_WIDTH = 10
 GRID_HEIGHT = 10
 TOTAL_PIXELS = GRID_WIDTH * GRID_HEIGHT
 MAX_PIXELS = 20
 DEFAULT_COLOR = "#1a1a2e"
+
+# Phases
+STATE_WAITING = "WAITING"
+STATE_PLACEMENT = "PLACEMENT"
+STATE_PLAYING = "PLAYING"
+STATE_GAME_OVER = "GAME_OVER"
+
+# Win conditions
+HITS_TO_WIN = 11
+SCORE_TO_WIN = 1000
+
+# Scoring
+FIRST_HIT_POINTS = 1
+SECOND_HIT_POINTS = 99
+COMBO_STEP_POINTS = 100
+MAX_COMBO_POINTS = 500
+MISS_POINTS = -1
+
+# Input limits (keeps lobby payloads and UI text bounded)
+USERNAME_MAX_LENGTH = 15
+ROOM_NAME_MAX_LENGTH = 40

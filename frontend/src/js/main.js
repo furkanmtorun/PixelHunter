@@ -1,181 +1,181 @@
-import { state, PALETTE, MAX_PIXELS } from './config.js';
-import { initCanvas, redrawBoard, getIndex } from './canvas.js';
-import { connect } from './network.js';
-import { showToast, updateUI } from './ui.js';
+import { state, PALETTE, MAX_PIXELS, PHASE } from './config.js';
+import { initCanvas, redrawBoard, getIndex, hoverAt, clearHover } from './canvas.js';
+import { connect, send, joinLobby } from './network.js';
+import { showToast, updateLockButton } from './ui.js';
+import { byId } from './dom.js';
 
-document.addEventListener('DOMContentLoaded', () => {
-  // Connect immediately to show online count and version
-  connect();
+function inGame() {
+  return state.gameState !== PHASE.LOGIN && state.gameState !== PHASE.LOBBY;
+}
 
-  // Login & Initialization
-  const loginOverlay = document.getElementById('login-overlay');
-  const userColorWrap = document.getElementById('user-color-wrap');
-  const loginBtn = document.getElementById('login-btn');
-  const usernameInput = document.getElementById('username-input');
+function setupLogin() {
+  const colorWrap = byId('user-color-wrap');
+  const loginBtn = byId('login-btn');
+  const usernameInput = byId('username-input');
 
-  PALETTE.forEach((color, i) => {
-    const opt = document.createElement('div');
-    opt.className = 'color-option';
-    opt.style.background = color;
-    opt.style.boxShadow = `inset 0 0 0 1px rgba(0,0,0,0.2)`;
-    if (i === 0) opt.classList.add('active');
-    opt.addEventListener('click', () => {
-      document.querySelectorAll('.color-option').forEach(el => el.classList.remove('active'));
-      opt.classList.add('active');
+  PALETTE.forEach((color, index) => {
+    const option = document.createElement('div');
+    option.className = 'color-option';
+    option.style.background = color;
+    option.style.boxShadow = 'inset 0 0 0 1px rgba(0,0,0,0.2)';
+    option.dataset.color = color;
+    if (index === 0) option.classList.add('active');
+
+    option.addEventListener('click', () => {
+      for (const el of colorWrap.querySelectorAll('.color-option')) {
+        el.classList.remove('active');
+      }
+      option.classList.add('active');
       state.myColor = color;
-      document.getElementById('logo').style.background = `linear-gradient(135deg, ${color}, #fff)`;
-      document.getElementById('logo').style.webkitBackgroundClip = 'text';
+      byId('logo').style.background = `linear-gradient(135deg, ${color}, #fff)`;
     });
-    userColorWrap.appendChild(opt);
+    colorWrap.append(option);
   });
 
   usernameInput.addEventListener('input', () => {
     loginBtn.disabled = usernameInput.value.trim().length === 0;
   });
 
+  usernameInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && !loginBtn.disabled) loginBtn.click();
+  });
+
   loginBtn.addEventListener('click', () => {
-    const val = usernameInput.value.trim();
-    if (!val) return;
-    state.username = val;
-    loginOverlay.classList.add('hidden');
-    document.getElementById('lobby-overlay').classList.remove('hidden');
-    
-    // Send join lobby message now that we have username/color
-    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
-      state.ws.send(JSON.stringify({ type: 'join_lobby', username: state.username, color: state.myColor }));
-    }
+    const username = usernameInput.value.trim();
+    if (!username) return;
+
+    state.username = username;
+    state.gameState = PHASE.LOBBY;
+    byId('login-overlay').classList.add('hidden');
+    byId('lobby-overlay').classList.remove('hidden');
+    joinLobby(); // queued automatically if the socket is still connecting
+  });
+}
+
+function setupLobby() {
+  byId('create-room-btn').addEventListener('click', () => {
+    send({ type: 'create_room', room_name: `${state.username}'s Game` });
   });
 
-  usernameInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter' && !loginBtn.disabled) loginBtn.click();
+  // One delegated listener survives every lobby re-render.
+  byId('room-list').addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-room-id]');
+    if (!button) return;
+    send({ type: 'join_room', room_id: button.dataset.roomId });
   });
+}
 
-  // Lobby Handlers
-  document.getElementById('create-room-btn').addEventListener('click', () => {
-    if (state.ws) {
-      state.ws.send(JSON.stringify({ type: 'create_room', room_name: `${state.username}'s Game` }));
-    }
-  });
+function setupGameControls() {
+  const lockBtn = byId('lock-btn');
 
-  window.joinRoom = function(roomId) {
-    if (state.ws) {
-      state.ws.send(JSON.stringify({ type: 'join_room', room_id: roomId }));
-    }
-  };
-
-  window.addEventListener('resize', () => {
-    if (state.gameState !== 'LOGIN' && state.gameState !== 'LOBBY') {
-      initCanvas();
-    }
-  });
-
-  // Buttons
-  const lockBtn = document.getElementById('lock-btn');
   lockBtn.addEventListener('click', () => {
-    if (state.myLockedPixels.size === MAX_PIXELS) {
-      state.ws.send(JSON.stringify({ type: 'lock_pixels', pixels: Array.from(state.myLockedPixels) }));
-      lockBtn.textContent = "Waiting for opponent...";
-      lockBtn.disabled = true;
-      lockBtn.classList.remove('ready');
-    }
+    if (state.myLockedPixels.size !== MAX_PIXELS) return;
+
+    send({ type: 'lock_pixels', pixels: [...state.myLockedPixels] });
+    lockBtn.textContent = 'Waiting for opponent...';
+    lockBtn.disabled = true;
+    lockBtn.classList.remove('ready');
   });
 
-  const toggleViewBtn = document.getElementById('toggle-view-btn');
+  const toggleViewBtn = byId('toggle-view-btn');
   toggleViewBtn.addEventListener('click', () => {
     state.viewingMyShips = !state.viewingMyShips;
-    toggleViewBtn.textContent = state.viewingMyShips ? "View Target Pixels" : "View My Pixels";
+    toggleViewBtn.textContent = state.viewingMyShips
+      ? 'View Target Pixels'
+      : 'View My Pixels';
+    clearHover();
     redrawBoard();
   });
+}
 
-  // Canvas Interactions
-  setTimeout(() => {
-    const pCanvas = document.getElementById('pixelCanvas');
-    if(!pCanvas) return;
-    
-    let lastHover = -1;
-    pCanvas.addEventListener('mousemove', e => {
-      if (state.gameState !== 'PLACEMENT' && state.gameState !== 'PLAYING') return;
-      
-      const idx = getIndex(e);
-      if (idx === lastHover) return;
-      lastHover = idx;
-      
-      const hoverCanvas = document.getElementById('hoverCanvas');
-      const hCtx = hoverCanvas.getContext('2d');
-      hCtx.clearRect(0, 0, hoverCanvas.width, hoverCanvas.height);
-      if (idx < 0) return;
+function setupCanvasInput() {
+  const canvas = byId('pixelCanvas');
+  let lastHover = -1;
 
-      if (state.gameState === 'PLACEMENT') {
-        const isSelected = state.myLockedPixels.has(idx);
-        hCtx.fillStyle = isSelected ? 'rgba(255,90,90,0.5)' : 'rgba(255,255,255,0.2)';
-        const col = idx % state.GRID_W;
-        const row = Math.floor(idx / state.GRID_W);
-        hCtx.fillRect(col * state.cellSize, row * state.cellSize, state.cellSize, state.cellSize);
-      } else if (state.gameState === 'PLAYING') {
-        if (state.viewingMyShips) return;
-        const isMyTurn = state.currentTurn === state.myPlayerNum;
-        if (isMyTurn && !state.opponentMisses.has(idx) && !state.opponentHits.has(idx)) {
-          hCtx.fillStyle = 'rgba(255,255,255,0.2)';
-        } else {
-          hCtx.fillStyle = 'rgba(255,50,50,0.3)';
-        }
-        const col = idx % state.GRID_W;
-        const row = Math.floor(idx / state.GRID_W);
-        hCtx.fillRect(col * state.cellSize, row * state.cellSize, state.cellSize, state.cellSize);
+  canvas.addEventListener(
+    'mousemove',
+    (event) => {
+      if (state.gameState !== PHASE.PLACEMENT && state.gameState !== PHASE.PLAYING) return;
+
+      const index = getIndex(event);
+      if (index === lastHover) return;
+      lastHover = index;
+      hoverAt(index);
+    },
+    { passive: true },
+  );
+
+  canvas.addEventListener('mouseleave', () => {
+    lastHover = -1;
+    clearHover();
+  });
+
+  canvas.addEventListener('mousedown', (event) => {
+    if (event.button !== 0) return;
+
+    const index = getIndex(event);
+    if (index < 0) return;
+
+    if (state.gameState === PHASE.PLACEMENT) {
+      if (state.myLockedPixels.has(index)) {
+        state.myLockedPixels.delete(index);
+      } else if (state.myLockedPixels.size < MAX_PIXELS) {
+        state.myLockedPixels.add(index);
+      } else {
+        showToast(`You can only select ${MAX_PIXELS} pixels.`);
+        return;
       }
-    });
 
-    pCanvas.addEventListener('mouseleave', () => {
-      lastHover = -1;
-      const hoverCanvas = document.getElementById('hoverCanvas');
-      const hCtx = hoverCanvas.getContext('2d');
-      hCtx.clearRect(0, 0, hoverCanvas.width, hoverCanvas.height);
-    });
+      updateLockButton();
+      hoverAt(index);
+      redrawBoard();
+      return;
+    }
 
-    pCanvas.addEventListener('mousedown', e => {
-      if (e.button !== 0) return;
-      const idx = getIndex(e);
-      if (idx < 0) return;
+    if (state.gameState !== PHASE.PLAYING || state.viewingMyShips) return;
 
-      if (state.gameState === 'PLACEMENT') {
-        if (state.myLockedPixels.has(idx)) {
-          state.myLockedPixels.delete(idx);
-        } else {
-          if (state.myLockedPixels.size < MAX_PIXELS) {
-            state.myLockedPixels.add(idx);
-          } else {
-            showToast("You can only select 20 pixels.");
-            return;
-          }
-        }
-        
-        // Update lock button
-        const lockBtn = document.getElementById('lock-btn');
-        lockBtn.textContent = `Lock In (${state.myLockedPixels.size}/${MAX_PIXELS})`;
-        if (state.myLockedPixels.size === MAX_PIXELS) {
-          lockBtn.classList.add('ready');
-          lockBtn.disabled = false;
-        } else {
-          lockBtn.classList.remove('ready');
-          lockBtn.disabled = true;
-        }
-        redrawBoard();
-      } 
-      else if (state.gameState === 'PLAYING') {
-        if (state.viewingMyShips) return;
-        if (state.currentTurn !== state.myPlayerNum) {
-          showToast("It's not your turn!");
-          return;
-        }
-        if (state.opponentHits.has(idx) || state.opponentMisses.has(idx)) {
-          return; // Already guessed
-        }
-        
-        // Send guess
-        if (state.ws) {
-          state.ws.send(JSON.stringify({ type: 'guess', index: idx }));
-        }
-      }
-    });
-  }, 500); // give DOM a moment
-});
+    if (state.currentTurn !== state.myPlayerNum) {
+      showToast("It's not your turn!");
+      return;
+    }
+    if (state.opponentHits.has(index) || state.opponentMisses.has(index)) {
+      return; // Already guessed
+    }
+
+    send({ type: 'guess', index });
+    lastHover = -1;
+    clearHover();
+  });
+}
+
+function setupResize() {
+  let scheduled = 0;
+
+  window.addEventListener(
+    'resize',
+    () => {
+      if (!inGame() || scheduled) return;
+      scheduled = requestAnimationFrame(() => {
+        scheduled = 0;
+        initCanvas();
+        clearHover();
+      });
+    },
+    { passive: true },
+  );
+}
+
+function init() {
+  setupLogin();
+  setupLobby();
+  setupGameControls();
+  setupCanvasInput();
+  setupResize();
+  connect();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init, { once: true });
+} else {
+  init();
+}

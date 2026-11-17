@@ -1,15 +1,10 @@
 {
   "name": "pixelhunter",
   "version": "1.0.0",
-  "description": "A real-time collaborative pixel game",
+  "private": true,
+  "type": "module",
+  "description": "Neon, turn-based pixel Battleship.",
   "scripts": {
-    "test": "jest"
-  },
-  "devDependencies": {
-    "jest": "^29.7.0"
-  },
-  "jest": {
-    "transform": {},
-    "testEnvironment": "jsdom"
+    "test": "node --test"
   }
 }
